@@ -4,7 +4,7 @@ function template_preprocess_ting_object_cover(&$variables) {
   $object = $variables['object'] = $variables['elements']['#object'];
   $variables['image_style'] = $variables['elements']['#image_style'];
 
-  $local_id = ting_object_cover_extract_id($object);
+  $local_id = ting_cover_object_extract_id($object);
   //Set initial values required by the template
   $variables['classes'] = array('ting-cover',
                                 'ting-cover-object-id-' . $local_id,
@@ -44,7 +44,7 @@ function theme_ting_object_cover($variables) {
  * @return String
  *   The objects identifier, whether in a numeric, or hash representation.
  */
-function ting_object_cover_extract_id($entity) {
+function ting_cover_object_extract_id($entity) {
   $local_id = isset($entity->localId) ? $entity->localId : '';
 
   if (empty($local_id)) {
