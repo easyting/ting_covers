@@ -4,7 +4,7 @@ function template_preprocess_ting_object_cover(&$variables) {
   $object = $variables['object'] = $variables['elements']['#object'];
   $variables['image_style'] = $variables['elements']['#image_style'];
 
-  $local_id = ting_cover_object_extract_id($object);
+  $local_id = $object->localId;
   //Set initial values required by the template
   $variables['classes'] = array('ting-cover',
                                 'ting-cover-object-id-' . $local_id,
@@ -31,27 +31,4 @@ function template_preprocess_ting_object_cover(&$variables) {
 
 function theme_ting_object_cover($variables) {
   return '<div class="' . implode(' ', $variables['classes']) . '">' . $variables['image'] . '</div>';
-}
-
-/**
- * Get the entity local id.
- *
- * This is useful since not always we have the local_id field value,
- * but we do the ding_entity_it.
- *
- * @param TingObject $entity
- *   The entity object whose is is expected.
- * @return String
- *   The objects identifier, whether in a numeric, or hash representation.
- */
-function ting_cover_object_extract_id($entity) {
-  $local_id = isset($entity->localId) ? $entity->localId : '';
-
-  if (empty($local_id)) {
-    $ding_id = $entity->ding_entity_id;
-    $local_id = explode(':', $ding_id);
-    $local_id = !empty($local_id[1]) ? $local_id[1] : 0;
-  }
-
-  return $local_id;
 }
