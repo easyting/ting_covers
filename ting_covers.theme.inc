@@ -14,7 +14,13 @@ function template_preprocess_ting_object_cover(&$variables) {
   $path = ting_covers_object_path($object->localId);
   if (file_exists($path)) {
     //Generate an alt tag
-    $alt = implode(', ', $object->creators) . ': ' . $object->title;
+    if (!empty($variables['elements']['#alt'])) {
+      // Pass '#alt' value in elements to overwrite default alt.
+      $alt = $variables['elements']['#alt'];
+    }
+    else {
+      $alt = implode(', ', $object->creators) . ': ' . $object->title;
+    }
 
     $variables['image'] = theme('image_style', array('style_name' => $variables['image_style'], 'path' => $path, 'alt' => $alt));
 
