@@ -4,16 +4,24 @@ function template_preprocess_ting_object_cover(&$variables) {
   $object = $variables['object'] = $variables['elements']['#object'];
   $variables['image_style'] = $variables['elements']['#image_style'];
 
-  //Set initial values required by the template
-  $variables['classes'] = array('ting-cover',
-                                'ting-cover-object-id-' . $object->localId,
-                                'ting-cover-style-' . $variables['image_style']);
+  // Set initial values required by the template.
+  $variables['classes'] = array(
+    'ting-cover',
+    'ting-cover-object-id-' . $object->localId,
+    'ting-cover-style-' . $variables['image_style'],
+  );
+
+  // Add isbn-* class, used by VoxB.
+  if (!empty($object->isbn)) {
+    $variables['classes'][] = 'isbn-' . $object->isbn[0];
+  }
+
   $variables['image'] = '';
 
-  //If we already have the image available locally then just use it
+  //If we already have the image available locally then just use it.
   $path = ting_covers_object_path($object->localId);
   if (file_exists($path)) {
-    //Generate an alt tag
+    // Generate an alt tag.
     if (!empty($variables['elements']['#alt'])) {
       // Pass '#alt' value in elements to overwrite default alt.
       $alt = $variables['elements']['#alt'];
@@ -24,12 +32,12 @@ function template_preprocess_ting_object_cover(&$variables) {
 
     $variables['image'] = theme('image_style', array('style_name' => $variables['image_style'], 'path' => $path, 'alt' => $alt));
 
-    //Avoid further javascript processing
+    // Avoid further javascript processing.
     $variables['classes'][] = 'ting-cover-processed';
   }
   elseif (cache_get('ting_covers:' . $object->localId)) {
-    //We know that there is no cover available for this object so avoid
-    //further javascript processing
+    // We know that there is no cover available for this object so avoid
+    // further javascript processing.
     $variables['classes'][] = 'ting-cover-processed';
   }
 }
