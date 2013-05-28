@@ -8,9 +8,8 @@ function ting_covers_objects() {
   $missing_images_local_ids = array();
 
   foreach ($_POST['coverData'] as $cover_info) {
-    //Reverse cover_info before and after explode to make sure that we explode around
-    //the last :. Local ids could contain the delimiter!
-    list($local_id, $image_style) = array_reverse(array_map('strrev', explode(':', strrev($cover_info), 2)));
+    // $cover_info = loacl_id:image_style.
+    list($local_id, $image_style) = explode(':', $cover_info);
 
     //Determine if the local id is a known negative
     if (cache_get('ting_covers:' . $local_id, FALSE)) {
