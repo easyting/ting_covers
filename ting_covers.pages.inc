@@ -8,7 +8,7 @@ function ting_covers_objects() {
   $missing_images_local_ids = array();
 
   foreach ($_POST['coverData'] as $cover_info) {
-    // $cover_info = loacl_id:image_style.
+    // In $cover_info we have "local_id:image_style" string.
     list($local_id, $image_style) = explode(':', $cover_info);
 
     //Determine if the local id is a known negative
