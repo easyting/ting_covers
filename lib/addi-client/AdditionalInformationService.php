@@ -1,19 +1,37 @@
 <?php
+/**
+ * @file
+ * AdditionalInformationService class.
+ */
 
 class AdditionalInformationService {
-  private $wsdlUrl;
-  private $username;
-  private $group;
-  private $password;
-  private $current_service;
+  protected $wsdlUrl;
+  protected $username;
+  protected $group;
+  protected $password;
 
-  public function __construct($wsdlUrl, $username, $group, $password) {
-    $this->wsdlUrl = $wsdlUrl;
+
+  /**
+    * Instantiate the addi client.
+    */
+  public function __construct($wsdl_url, $username, $group, $password) {
+    $this->wsdlUrl = $wsdl_url;
     $this->username = $username;
     $this->group = $group;
     $this->password = $password;
   }
 
+
+  /**
+   * Get information by ISBN.
+   *
+   * @param mixed $isbn
+   *   Expects either a single ISBN, or an array of them, for looking up
+   *   multiple materials at a time.
+   *
+   * @return array
+   *   Array of the images that were found.
+   */
   public function getByIsbn($isbn) {
     $isbn = str_replace('-', '', $isbn);
 
@@ -22,58 +40,113 @@ class AdditionalInformationService {
     return $this->extractAdditionalInformation('isbn', $response);
   }
 
+  /**
+   * Get information by FAUST number.
+   *
+   * @param mixed $faust_number
+   *   Expects either a single FAUST number, or an array of them, for looking
+   *   up multiple materials at a time.
+   *
+   * @return array
+   *   Array of the images that were found.
+   */
   public function getByFaustNumber($faustNumber) {
     $identifiers = $this->collectIdentifiers('faust', $faustNumber);
     $response = $this->sendRequest($identifiers);
     return $this->extractAdditionalInformation('faust', $response);
   }
 
-  protected function collectIdentifiers($idName, $ids) {
+  /**
+   * Get information by local ID and library code.
+   *
+   * @param mixed $local_id
+   *   Expects either a single object with localIdentifier and libraryCode
+   *   attributes, or an array of such objects.
+   *
+   * @return array
+   *   Array of the images that were found.
+   */
+  public function getByLocalIdentifier($local_id) {
+    $identifiers = $this->collectIdentifiers('localIdentifier', $local_id);
+    $response = $this->sendRequest($identifiers);
+    return $this->extractAdditionalInformation('localIdentifier', $response);
+  }
+
+  /**
+   * Expand the provided IDs into the array structure used in sendRequest.
+   */
+  protected function collectIdentifiers($id_type, $ids) {
     if (!is_array($ids)) {
       $ids = array($ids);
     }
 
     $identifiers = array();
-    foreach ($ids as $i) {
-      $identifiers[] = array($idName => $i);
+    foreach ($ids as $id) {
+      // If we're passed objects from getByLocalIdentifier, convert them
+      // to arrays.
+      if (is_object($id)) {
+        $identifiers[] = (array) $id;
+      }
+      // Otherwise, just map the ID type to the ID number.
+      else {
+        $identifiers[] = array($id_type => $id);
+      }
     }
 
     return $identifiers;
   }
 
+  /**
+   * Send request to the addi server, returning the data response.
+   */
   protected function sendRequest($identifiers) {
-    $ids = array();
-    foreach ($identifiers as $i) {
-      $ids = array_merge($ids, array_values($i));
-    }
-
     $authInfo = array('authenticationUser' => $this->username,
                       'authenticationGroup' => $this->group,
                       'authenticationPassword' => $this->password);
-    $client = new SoapClient($this->wsdlUrl);
 
+    // New moreinfo service.
+    $client = new SoapClient($this->wsdlUrl . '/moreinfo.wsdl');
+
+    // Record the start time, so we can calculate the difference, once
+    // the addi service responds.
     $startTime = explode(' ', microtime());
-    $response = NULL;
 
-    $cover_service = variable_get('current_cover_service');
-    $method = '';
+    // Start on the responce object.
+    $response = new stdClass();
+    $response->identifierInformation = array();
 
-    if ($cover_service == SERVICE_ADDI) {
-      $method = 'additionalInformation';
-      $this->current_service = SERVICE_ADDI;
-    }
-    elseif ($cover_service == SERVICE_MOREINFO) {
-      $method = 'moreInfo';
-      $this->current_service = SERVICE_MOREINFO;
-    }
-    else {
-      throw new AdditionalInformationServiceException('Current cover service not set, check the settings.');
-    }
-
+    // Try to get covers 40 at the time as the service has a limit.
     try {
-      $response = $client->$method(array(
-                          'authentication' => $authInfo,
-                          'identifier' => $identifiers));
+      $offset = 0;
+      $ids = array_slice($identifiers, $offset, 40);
+      while (!empty($ids)) {
+        $data = $client->moreInfo(array(
+          'authentication' => $authInfo,
+          'identifier' => $ids,
+        ));
+
+        // Check if the request went through.
+        if ($data->requestStatus->statusEnum != 'ok') {
+          throw new AdditionalInformationServiceException($response->requestStatus->statusEnum . ': ' . $response->requestStatus->errorText);
+        }
+
+        // Move result into the responce object.
+        $response->requestStatus = $data->requestStatus;
+        if (is_array($data->identifierInformation)) {
+          // If more than one element have been found an array is returned.
+          $response->identifierInformation = array_merge($response->identifierInformation, $data->identifierInformation);
+        }
+        else {
+          // If only one "cover" have been request, we need to wrap the data in
+          // an array.
+          $response->identifierInformation = array_merge($response->identifierInformation, array($data->identifierInformation));
+        }
+
+        // Single image... not array but object.
+
+        $offset += 40;
+        $ids = array_splice($identifiers, $offset, 40);
+      }
     }
     catch (Exception $e) {
       // Re-throw Addi specific exception.
@@ -88,10 +161,6 @@ class AdditionalInformationService {
       watchdog('addi', 'Completed request (' . round($time, 3) . 's): Ids: %ids', array('%ids' => implode(', ', $ids)), WATCHDOG_DEBUG, 'http://' . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]);
     }
 
-    if ($response->requestStatus->statusEnum != 'ok') {
-      throw new AdditionalInformationServiceException($response->requestStatus->statusEnum . ': ' . $response->requestStatus->errorText);
-    }
-
     if (!is_array($response->identifierInformation)) {
       $response->identifierInformation = array($response->identifierInformation);
     }
@@ -99,13 +168,15 @@ class AdditionalInformationService {
     return $response;
   }
 
+  /**
+   * Extract the data we need from the server response.
+   */
   protected function extractAdditionalInformation($idName, $response) {
     $additionalInformations = array();
 
     foreach ($response->identifierInformation as $info) {
-      $thumbnailUrl = $detailUrl = NULL;
-      $cover_image = ($this->current_service == SERVICE_MOREINFO && isset($info->coverImage))
-                        ? $info->coverImage : (isset($info->image) ? $info->image : NULL);
+      $thumbnail_url = $detail_url = NULL;
+      $cover_image =  isset($info->coverImage) ? $info->coverImage : FALSE;
 
       if (isset($info->identifierKnown) && $info->identifierKnown && $cover_image) {
         if (!is_array($cover_image)) {
@@ -115,17 +186,18 @@ class AdditionalInformationService {
         foreach ($cover_image as $image) {
           switch ($image->imageSize) {
             case 'thumbnail':
-              $thumbnailUrl = $image->_;
+              $thumbnail_url = $image->_;
               break;
             case 'detail':
-              $detailUrl = $image->_;
+              $detail_url = $image->_;
               break;
             default:
-              // Do nothing other image sizes may appear but ignore them for now
+              // Do nothing other image sizes may appear but ignore them for
+              // now.
           }
         }
 
-        $additionalInfo = new AdditionalInformation($thumbnailUrl, $detailUrl);
+        $additionalInfo = new AdditionalInformation($thumbnail_url, $detail_url);
         $additionalInformations[$info->identifier->$idName] = $additionalInfo;
       }
     }
