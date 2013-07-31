@@ -12,8 +12,8 @@ class AdditionalInformationService {
 
 
   /**
-    * Instantiate the addi client.
-    */
+   * Instantiate the addi client.
+   */
   public function __construct($wsdl_url, $username, $group, $password) {
     $this->wsdlUrl = $wsdl_url;
     $this->username = $username;
