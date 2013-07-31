@@ -6,7 +6,7 @@
  */
 
 /**
- * Implements hook_update_N().
+ * Changed fetched covers form managed to unmanaged files.
  */
 function ting_covers_update_7100(&$sandbox) {
   // Cleanup covers from DB, saved previously with file_save_data().
@@ -14,4 +14,3 @@ function ting_covers_update_7100(&$sandbox) {
   $query->where('LENGTH(filename) = :limit AND (uri LIKE :ting_obj OR uri LIKE :search_cr)', array(':limit' => 36, ':ting_obj' => '%ting/covers/object%', 'search_cr' => '%ting_search_carousel%'));
   $query->execute();
 }
-
