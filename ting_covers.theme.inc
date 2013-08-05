@@ -5,11 +5,13 @@ function template_preprocess_ting_object_cover(&$variables) {
   $variables['image_style'] = $variables['elements']['#image_style'];
 
   $local_id = $object->localId;
+  $owner_id = $object->ownerId;
   // Set initial values required by the template.
   $variables['classes'] = array(
     'ting-cover',
     'ting-cover-object-id-' . $local_id,
     'ting-cover-style-' . $variables['image_style'],
+    'ting-cover-owner-id-' . $owner_id,
   );
 
   // Add isbn-* class, used by VoxB.
