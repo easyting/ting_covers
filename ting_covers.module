@@ -69,14 +69,39 @@ function ting_covers_theme() {
  * Implementation of hook_cron().
  */
 function ting_covers_cron() {
-  _ting_covers_delete_old_files($_SERVER['REQUEST_TIME'] - variable_get('ting_covers_cache_lifetime', TING_COVERS_DEFAULT_CACHE_LIFETIME));
+  $time = variable_get('ting_covers_cache_lifetime', TING_COVERS_DEFAULT_CACHE_LIFETIME);
+  $delta = $_SERVER['REQUEST_TIME'] - $time;
+  $files = _ting_covers_collect_old_files($delta);
+
+  $queue = DrupalQueue::get('ting_covers_delete_old_files');
+  foreach($files as $file) {
+    $queue->createItem($file);
+  }
+}
+
+/*
+ * Implements hook_cron_queue_info().
+ */
+function ting_covers_cron_queue_info() {
+  $queues['ting_covers_delete_old_files'] = array(
+    'worker callback' => 'file_unmanaged_delete',
+    'time' => 5,
+  );
+
+  return $queues;
 }
 
 /**
  * Implementation of hook_cache_clear().
  */
 function ting_covers_flush_caches() {
-  _ting_covers_delete_old_files($_SERVER['REQUEST_TIME'] - variable_get('ting_covers_cache_lifetime', TING_COVERS_DEFAULT_CACHE_LIFETIME));
+  $time = variable_get('ting_covers_cache_lifetime', TING_COVERS_DEFAULT_CACHE_LIFETIME);
+  $delta = $_SERVER['REQUEST_TIME'] - $time;
+  $files = _ting_covers_collect_old_files($delta);
+
+  foreach ($files as $file) {
+    file_unmanaged_delete($file);
+  }
 }
 
 /**
@@ -106,15 +131,15 @@ function ting_covers_preprocess_ting_object(&$variables) {
 }
 
 /**
- * Delete ting covers files.
+ * Collect old ting cover files.
  *
  * @todo: handle image styles better and use API to flush expired images.
  *
  * @param int $time Timestamp where older files will be deleted.
- * 	Obmit or set to NULL to delete all files.
+ * 	Omit or set to NULL to delete all files.
  */
-function _ting_covers_delete_old_files($time = NULL) {
-  // Collect potential locations of cover folders
+function _ting_covers_collect_old_files($time = NULL) {
+  // Collect potential locations of cover folders.
   $files_dir = file_default_scheme() . '://';
   $image_dirs = array($files_dir);
 
@@ -126,7 +151,7 @@ function _ting_covers_delete_old_files($time = NULL) {
     }
   }
 
-  // Collect cover files
+  // Collect cover files.
   $cover_files = array();
   foreach ($image_dirs as $uri) {
     $ting_covers_dir = $uri . DIRECTORY_SEPARATOR . 'ting' . DIRECTORY_SEPARATOR . 'covers';
@@ -135,12 +160,15 @@ function _ting_covers_delete_old_files($time = NULL) {
     }
   }
 
-  //Delete obsolete files
+  // Collect obsolete files.
+  $files = array();
   foreach ($cover_files as $file) {
     if (!$time || (filemtime($file) < $time)) {
-      file_unmanaged_delete($file);
+      $files[] = $file;
     }
   }
+
+  return $files;
 }
 
 /**
