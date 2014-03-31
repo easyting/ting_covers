@@ -7,7 +7,7 @@
     var local_id = classname.match(/ting-cover-object-id-(\S+)/);
     var image_style = classname.match(/ting-cover-style-(\S+)/);
     var owner_id = classname.match(/ting-cover-owner-id-(\S+)/);
-    if (!local_id) {
+    if (!local_id || !owner_id) {
       return false;
     }
     return {
